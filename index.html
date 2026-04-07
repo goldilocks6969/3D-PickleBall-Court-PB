@@ -401,6 +401,13 @@
         </div>
         <div class="toggle active" id="toggleLighting" onclick="toggleOption(this)"></div>
       </div>
+      <div class="field" style="padding:8px 0 4px 0;">
+        <label>Light Placement</label>
+        <select id="lightPlacement" onchange="updateScene()">
+          <option value="cornered" selected>Cornered</option>
+          <option value="centered">Centered</option>
+        </select>
+      </div>
       <div class="toggle-row">
         <div>
           <div class="toggle-label">Surrounding Grass</div>
@@ -596,7 +603,7 @@ function createCourtMaterial(hexColor) {
 }
 
 // ── Build Court ──
-function createSingleCourt(courtL, courtW, bufferSide, bufferEnd, courtColor, bufferColor, showFence, showNet, showLighting) {
+function createSingleCourt(courtL, courtW, bufferSide, bufferEnd, courtColor, bufferColor, showFence, showNet, showLighting, fenceH, showDrainage, lightPlacement) {
   const group = new THREE.Group();
   const totalL = courtL + 2 * bufferEnd;
   const totalW = courtW + 2 * bufferSide;
@@ -778,12 +785,21 @@ function createSingleCourt(courtL, courtW, bufferSide, bufferEnd, courtColor, bu
   if (showLighting) {
     const poleHeight = 20; // 20ft
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.6, roughness: 0.3 });
-    const polePositions = [
-      [-totalL / 2 - 3, totalW / 2 + 3],
-      [totalL / 2 + 3, totalW / 2 + 3],
-      [-totalL / 2 - 3, -totalW / 2 - 3],
-      [totalL / 2 + 3, -totalW / 2 - 3],
-    ];
+    placement = lightPlacement || 'cornered';
+    let polePositions;
+    if (placement === 'centered') {
+      polePositions = [
+        [0, totalW / 2 + 3],
+        [0, -totalW / 2 - 3],
+      ];
+    } else {
+      polePositions = [
+        [-totalL / 2 - 3, totalW / 2 + 3],
+        [totalL / 2 + 3, totalW / 2 + 3],
+        [-totalL / 2 - 3, -totalW / 2 - 3],
+        [totalL / 2 + 3, -totalW / 2 - 3],
+      ];
+    }
 
     polePositions.forEach(([px, pz]) => {
       // Pole
@@ -864,7 +880,7 @@ function updateScene() {
   const courts = [];
 
   for (let i = 0; i < courtCount; i++) {
-    const court = createSingleCourt(courtL, courtW, bufSide, bufEnd, selectedCourtColor, selectedBufferColor, showFence, showNet, showLighting);
+    const court = createSingleCourt(courtL, courtW, bufSide, bufEnd, selectedCourtColor, selectedBufferColor, showFence, showNet, showLighting, fenceH, showDrainage, lightPlacement);
     court.userData.isCourt = true;
 
     let posX = 0, posZ = 0;
