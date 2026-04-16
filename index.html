@@ -846,6 +846,118 @@ function createSingleCourt(courtL, courtW, bufferSide, bufferEnd, courtColor, bu
   return group;
 }
 
+// ══════════════════════════════════════════════
+// PERIMETER FENCE — wraps ALL courts as one unit
+// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════
+// DRAINAGE SYSTEM — shared across all courts
+//   1 court  → 1 drain on one long edge
+//   2-5 courts → 2 drains on the outer long edges
+// ══════════════════════════════════════════════
+function buildDrainageSystem(parentScene, courtCount, areaL, areaW, centerX, centerZ) {
+  const group = new THREE.Group();
+  const drainMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.6, metalness: 0.2 });
+  const grateMat = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.4, metalness: 0.5 });
+  const drainLen = areaL + 2;
+  const drainOffset = 1.2;
+  const sides = courtCount === 1 ? [1] : [-1, 1];
+  sides.forEach(side => {
+    const zPos = side * (areaW / 2 + drainOffset);
+    const channel = new THREE.Mesh(new THREE.BoxGeometry(drainLen, 0.4, 1.2), drainMat);
+    channel.position.set(0, 0.05, zPos);
+    channel.receiveShadow = true;
+    group.add(channel);
+    const grateCount = Math.floor(drainLen / 2);
+    for (let i = 0; i < grateCount; i++) {
+      const grate = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 1.0), grateMat);
+      grate.position.set(-drainLen / 2 + 1 + i * 2, 0.28, zPos);
+      group.add(grate);
+      for (let s = 0; s < 4; s++) {
+        const slot = new THREE.Mesh(
+          new THREE.BoxGeometry(1.4, 0.08, 0.04),
+          new THREE.MeshStandardMaterial({ color: 0x333333 })
+        );
+        slot.position.set(-drainLen / 2 + 1 + i * 2, 0.28, zPos - 0.35 + s * 0.25);
+        group.add(slot);
+      }
+    }
+    [-1, 1].forEach(endSide => {
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 1.4), drainMat);
+      cap.position.set(endSide * (drainLen / 2 + 0.15), 0.1, zPos);
+      group.add(cap);
+    });
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 2, 8), drainMat);
+    pipe.rotation.z = Math.PI / 2;
+    pipe.position.set(drainLen / 2 + 1.15, 0.05, zPos);
+    group.add(pipe);
+    const drainLabel = document.createElement('canvas');
+    drainLabel.width = 256; drainLabel.height = 32;
+    const dlCtx = drainLabel.getContext('2d');
+    dlCtx.fillStyle = '#555555';
+    dlCtx.fillRect(0, 0, 256, 32);
+    dlCtx.font = 'bold 18px Arial';
+    dlCtx.fillStyle = '#cccccc';
+    dlCtx.textAlign = 'center';
+    dlCtx.fillText('WATER DRAINAGE', 128, 22);
+    const dlTex = new THREE.CanvasTexture(drainLabel);
+    const dlMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(6, 0.8),
+      new THREE.MeshStandardMaterial({ map: dlTex, roughness: 0.5 })
+    );
+    dlMesh.rotation.x = -Math.PI / 2;
+    dlMesh.position.set(0, 0.3, zPos + side * 1.0);
+    group.add(dlMesh);
+  });
+  group.position.set(centerX, 0, centerZ);
+  parentScene.add(group);
+}
+
+function buildPerimeterFence(parentScene, areaL, areaW, fenceHeight, centerX, centerZ) {
+  const group = new THREE.Group();
+  const postSpacing = 12;
+  const fencePostGeo = new THREE.CylinderGeometry(0.15, 0.15, fenceHeight, 6);
+  const fencePostMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.6, roughness: 0.4 });
+  const fenceWireMat = new THREE.MeshStandardMaterial({
+    color: 0xaaaaaa, transparent: true, opacity: 0.15, side: THREE.DoubleSide
+  });
+  const hL = areaL / 2;
+  const hW = areaW / 2;
+  [-1, 1].forEach(side => {
+    for (let x = -hL; x <= hL; x += postSpacing) {
+      const post = new THREE.Mesh(fencePostGeo, fencePostMat);
+      post.position.set(x, fenceHeight / 2, side * hW);
+      post.castShadow = true;
+      group.add(post);
+    }
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(areaL, fenceHeight), fenceWireMat);
+    panel.position.set(0, fenceHeight / 2, side * hW);
+    if (side === -1) panel.rotation.y = Math.PI;
+    group.add(panel);
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, areaL, 6), fencePostMat);
+    rail.rotation.z = Math.PI / 2;
+    rail.position.set(0, fenceHeight, side * hW);
+    group.add(rail);
+  });
+  [-1, 1].forEach(side => {
+    for (let z = -hW; z <= hW; z += postSpacing) {
+      const post = new THREE.Mesh(fencePostGeo, fencePostMat);
+      post.position.set(side * hL, fenceHeight / 2, z);
+      post.castShadow = true;
+      group.add(post);
+    }
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(areaW, fenceHeight), fenceWireMat);
+    panel.rotation.y = Math.PI / 2;
+    panel.position.set(side * hL, fenceHeight / 2, 0);
+    group.add(panel);
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, areaW, 6), fencePostMat);
+    rail.rotation.x = Math.PI / 2;
+    rail.position.set(side * hL, fenceHeight, 0);
+    group.add(rail);
+  });
+  group.position.set(centerX, 0, centerZ);
+  parentScene.add(group);
+}
+
 // ── Build Full Scene ──
 function updateScene() {
   // Clear existing courts
@@ -880,7 +992,7 @@ function updateScene() {
   const courts = [];
 
   for (let i = 0; i < courtCount; i++) {
-    const court = createSingleCourt(courtL, courtW, bufSide, bufEnd, selectedCourtColor, selectedBufferColor, showFence, showNet, showLighting, fenceH, showDrainage, lightPlacement);
+    const court = createSingleCourt(courtL, courtW, bufSide, bufEnd, selectedCourtColor, selectedBufferColor, false, showNet, showLighting, fenceH, false, lightPlacement);
     court.userData.isCourt = true;
 
     let posX = 0, posZ = 0;
@@ -900,6 +1012,32 @@ function updateScene() {
     court.position.set(posX, 0, posZ);
     scene.add(court);
     courts.push(court);
+  }
+
+  // ── Compute bounding area of all courts combined ──
+  let areaL, areaW, areaCenterX = 0, areaCenterZ = 0;
+  if (layout === 'side-by-side') {
+    areaL = totalL;
+    areaW = courtCount * totalW + (courtCount - 1) * gap;
+  } else if (layout === 'inline') {
+    areaL = courtCount * totalL + (courtCount - 1) * gap;
+    areaW = totalW;
+  } else { // grid (2 cols)
+    const cols = 2;
+    const rows = Math.ceil(courtCount / cols);
+    areaL = rows * totalL + (rows - 1) * gap;
+    areaW = Math.min(courtCount, cols) * totalW + (Math.min(courtCount, cols) - 1) * gap;
+  }
+
+  // ── Perimeter Fence (wraps ALL courts) ──
+  if (showFence) {
+    const fenceMargin = 3;
+    buildPerimeterFence(scene, areaL + fenceMargin * 2, areaW + fenceMargin * 2, fenceH, areaCenterX, areaCenterZ);
+  }
+
+  // ── Drainage System (shared across all courts) ──
+  if (showDrainage) {
+    buildDrainageSystem(scene, courtCount, areaL, areaW, areaCenterX, areaCenterZ);
   }
 
   // Ground plane
